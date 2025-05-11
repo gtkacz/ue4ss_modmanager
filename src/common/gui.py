@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import customtkinter as ctk
-from loguru import logger
 from PIL import Image
 
 from src.common.mod import UE4SSMod
@@ -36,10 +35,10 @@ class ModManagerGUI(ctk.CTk):
 		if icon_path and icon_path.exists():
 			try:
 				self.iconbitmap(icon_path)
-				#logger.debug(f"Set window icon: {icon_path}")
-			except Exception as e:
+				# logger.debug(f"Set window icon: {icon_path}")
+			except Exception:
 				pass
-				#logger.error(f"Failed to set window icon: {e}")
+				# logger.error(f"Failed to set window icon: {e}")
 
 		ctk.set_appearance_mode("dark")
 		ctk.set_default_color_theme("blue")
@@ -54,9 +53,9 @@ class ModManagerGUI(ctk.CTk):
 
 				self.logo_label = ctk.CTkLabel(self.main_frame, image=logo_image, text="")
 				self.logo_label.pack(pady=(0, 20))
-				#logger.debug(f"Set logo image: {logo_path}")
-			except Exception as e:
-				#logger.error(f"Failed to load logo image: {e}")
+				# logger.debug(f"Set logo image: {logo_path}")
+			except Exception:
+				# logger.error(f"Failed to load logo image: {e}")
 				self.title_label = ctk.CTkLabel(
 					self.main_frame,
 					text="UE4SS Mod Manager",
@@ -88,26 +87,29 @@ class ModManagerGUI(ctk.CTk):
 			variable=self.save_enabled_txt_var,
 			onvalue=True,
 			offvalue=False,
+			command=self.update_save_button_state,  # Add callback
 		)
 		self.save_enabled_txt.pack(side="left", padx=10, pady=10)
 
-		self.save_mods_json_var = ctk.BooleanVar(value=True)
+		self.save_mods_json_var = ctk.BooleanVar(value=False)
 		self.save_mods_json = ctk.CTkCheckBox(
 			self.save_options_frame,
 			text="Save mods.json",
 			variable=self.save_mods_json_var,
 			onvalue=True,
 			offvalue=False,
+			command=self.update_save_button_state,  # Add callback
 		)
 		self.save_mods_json.pack(side="left", padx=10, pady=10)
 
-		self.save_mods_txt_var = ctk.BooleanVar(value=True)
+		self.save_mods_txt_var = ctk.BooleanVar(value=False)
 		self.save_mods_txt = ctk.CTkCheckBox(
 			self.save_options_frame,
 			text="Save mods.txt",
 			variable=self.save_mods_txt_var,
 			onvalue=True,
 			offvalue=False,
+			command=self.update_save_button_state,  # Add callback
 		)
 		self.save_mods_txt.pack(side="left", padx=10, pady=10)
 
@@ -133,7 +135,16 @@ class ModManagerGUI(ctk.CTk):
 			text=f"Loaded {len(self.mod_manager.mods)} mods",
 			font=ctk.CTkFont(size=12),
 		)
-		self.status_bar.pack(pady=(10, 0), anchor="w")
+		self.status_bar.pack(pady=(50, 0), anchor="w")
+
+		self.update_save_button_state()
+
+	def update_save_button_state(self) -> None:
+		"""Update the save button state based on save options."""
+		if not (self.save_enabled_txt_var.get() or self.save_mods_json_var.get() or self.save_mods_txt_var.get()):
+			self.save_button.configure(state="disabled")
+		else:
+			self.save_button.configure(state="normal")
 
 	def populate_mod_list(self) -> None:
 		"""Populate the mod list with checkboxes for each mod."""
@@ -196,10 +207,10 @@ class ModManagerGUI(ctk.CTk):
 			enabled_count = sum(1 for mod in updated_mods if mod.enabled)
 			self.status_bar.configure(text=f"Changes saved. {enabled_count}/{len(updated_mods)} mods enabled.")
 
-			#logger.info(f"Saved changes to {len(updated_mods)} mods.")
+			# logger.info(f"Saved changes to {len(updated_mods)} mods.")
 
 		except Exception as e:
-			#logger.exception(f"Error saving changes: {e}")
+			# logger.exception(f"Error saving changes: {e}")
 			self.show_error("Error Saving Changes", str(e))
 
 	def toggle_all_mods(self) -> None:

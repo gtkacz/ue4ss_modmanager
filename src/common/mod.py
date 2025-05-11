@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from loguru import logger
-
 from src.common.exceptions import InvalidModException
 
 
@@ -35,7 +33,7 @@ class UE4SSMod:
 		name = path.stem
 
 		if not path.is_dir():
-			#logger.warning(f"Mod {name} is not a directory.")
+			# logger.warning(f"Mod {name} is not a directory.")
 			return None
 
 		scripts = [
@@ -51,7 +49,7 @@ class UE4SSMod:
 
 		enabled = (path / "enabled.txt").exists() or override_enabled
 
-		#logger.debug(f"Mod {name} is {'enabled' if enabled else 'disabled'} with {len(scripts)} script(s)")
+		# logger.debug(f"Mod {name} is {'enabled' if enabled else 'disabled'} with {len(scripts)} script(s)")
 
 		return cls(name=name, enabled=enabled, scripts=scripts, path=path)
 
@@ -62,17 +60,17 @@ class UE4SSMod:
 
 			if enabled_file.exists():
 				enabled_file.unlink()
-				#logger.debug(f"Enabled file {enabled_file} removed.")
+				# logger.debug(f"Enabled file {enabled_file} removed.")
 
 			# else:
-				#logger.warning(f"Enabled file {enabled_file} does not exist.")
+			# logger.warning(f"Enabled file {enabled_file} does not exist.")
 
 			self.enabled = False
 
-			#logger.debug(f"Mod {self.name} disabled.")
+			# logger.debug(f"Mod {self.name} disabled.")
 
 		# else:
-			#logger.debug(f"Mod {self.name} is already disabled.")
+		# logger.debug(f"Mod {self.name} is already disabled.")
 
 	def enable(self) -> None:
 		"""Enables the mod by creating an enabled.txt file."""
@@ -82,10 +80,10 @@ class UE4SSMod:
 
 			self.enabled = True
 
-			#logger.debug(f"Enabled file {enabled_file} created. Mod {self.name} enabled.")
+			# logger.debug(f"Enabled file {enabled_file} created. Mod {self.name} enabled.")
 
 		# else:
-			#logger.debug(f"Mod {self.name} is already enabled.")
+		# logger.debug(f"Mod {self.name} is already enabled.")
 
 	def __eq__(self, other: object) -> bool:
 		"""

@@ -2,8 +2,6 @@
 import sys
 from pathlib import Path
 
-from loguru import logger
-
 from src.common.exceptions import InvalidModException, InvalidModFolderException
 from src.common.gui import start_gui
 from src.common.mod_manager import UE4SSModManager
@@ -11,20 +9,19 @@ from src.common.mod_manager import UE4SSModManager
 
 def setup_logger() -> None:
 	"""Set up the logger for the application."""
-	#logger.remove()
-	#logger.add(
+	# logger.remove()
+	# logger.add(
 	# 	sys.stderr,
 	# 	format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
 	# 	level="INFO",
 	# )
-	#logger.add(
+	# logger.add(
 	# 	"ue4ss_modmanager.log",
 	# 	rotation="1 MB",
 	# 	retention="1 week",
 	# 	format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
 	# 	level="DEBUG",
 	# )
-	pass
 
 
 def find_mods_folder() -> Path:
@@ -98,20 +95,22 @@ def find_assets() -> tuple[Path, Path]:
 def main() -> None:
 	"""Main entry point for the application."""
 	setup_logger()
-	#logger.info("Starting UE4SS Mod Manager")
+	# logger.info("Starting UE4SS Mod Manager")
 
 	try:
 		mods_folder = find_mods_folder()
 		if not mods_folder:
 			import customtkinter as ctk
 
+			ctk.set_appearance_mode("dark")
 			app = ctk.CTk()
+			app.withdraw()  # Hide the main window
 
 			dialog = ctk.CTkToplevel(app)
 			dialog.title("Error")
-			dialog.geometry("400x150")
-			dialog.transient(app)
-			dialog.grab_set()
+			dialog.geometry("400x75")
+			dialog.minsize(400, 75)
+			dialog.attributes("-topmost", True)
 
 			frame = ctk.CTkFrame(dialog)
 			frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -142,10 +141,10 @@ def main() -> None:
 			app.mainloop()
 			return
 
-		#logger.info(f"Found mods folder: {mods_folder}")
+		# logger.info(f"Found mods folder: {mods_folder}")
 
 		logo_path, icon_path = find_assets()
-		#logger.debug(f"Logo path: {logo_path}, Icon path: {icon_path}")
+		# logger.debug(f"Logo path: {logo_path}, Icon path: {icon_path}")
 
 		try:
 			mod_manager = UE4SSModManager(mods_folder)
@@ -189,7 +188,7 @@ def main() -> None:
 		start_gui(mod_manager, logo_path, icon_path)
 
 	except Exception as e:
-		#logger.exception(f"Unhandled exception: {e}")
+		# logger.exception(f"Unhandled exception: {e}")
 
 		import customtkinter as ctk
 
