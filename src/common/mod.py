@@ -86,3 +86,18 @@ class UE4SSMod:
 
 		else:
 			logger.debug(f"Mod {self.name} is already enabled.")
+
+	def __eq__(self, other: object) -> bool:
+		"""
+		Checks if two UE4SSMod objects are equal based on their name.
+
+		Args:
+			other: The other object to compare with.
+
+		Returns:
+			Whether the two objects are equal.
+		"""
+		if not isinstance(other, UE4SSMod):
+			return False
+
+		return self.name == other.name
