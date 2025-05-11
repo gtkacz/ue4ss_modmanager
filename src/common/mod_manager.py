@@ -126,26 +126,40 @@ class UE4SSModManager:
 			f.writelines(output)
 			logger.debug(f"Enabled mods written to {txt_path}")
 
-	def parse_mods(self, mods: list[UE4SSMod]) -> None:
+	def parse_mods(
+		self,
+		mods: list[UE4SSMod],
+		*,
+		save_enabled_txt: bool = True,
+		save_mods_json: bool = True,
+		save_mods_txt: bool = True,
+	) -> None:
 		"""
 		Parses the mods and sets their enabled status.
 
 		Args:
 			mods: A list of UE4SSMod objects to parse.
+			save_enabled_txt: Whether to save the enabled status to the enabled.txt files
+			save_mods_json: Whether to save the enabled status to the mods.json file
+			save_mods_txt: Whether to save the enabled status to the mods.txt file
 		"""
 		enabled_mods = [mod for mod in mods if mod.enabled]
 		disabled_mods = [mod for mod in mods if not mod.enabled]
 
-		self._write_to_mods_json(enabled_mods)
-		self._write_to_mods_txt(enabled_mods)
+		if save_mods_json:
+			self._write_to_mods_json(enabled_mods)
 
-		if enabled_mods:
-			for mod in enabled_mods:
-				mod.enable()
+		if save_mods_txt:
+			self._write_to_mods_txt(enabled_mods)
 
-		if disabled_mods:
-			for mod in disabled_mods:
-				mod.disable()
+		if save_enabled_txt:
+			if enabled_mods:
+				for mod in enabled_mods:
+					mod.enable()
+
+			if disabled_mods:
+				for mod in disabled_mods:
+					mod.disable()
 
 		logger.debug(f"Parsed {len(mods)} mods.")
 

@@ -77,6 +77,39 @@ class ModManagerGUI(ctk.CTk):
 
 		self.populate_mod_list()
 
+		self.save_options_frame = ctk.CTkFrame(self.main_frame)
+		self.save_options_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+		self.save_enabled_txt_var = ctk.BooleanVar(value=True)
+		self.save_enabled_txt = ctk.CTkCheckBox(
+			self.save_options_frame,
+			text="Save enabled.txt",
+			variable=self.save_enabled_txt_var,
+			onvalue=True,
+			offvalue=False,
+		)
+		self.save_enabled_txt.pack(side="left", padx=10, pady=10)
+
+		self.save_mods_json_var = ctk.BooleanVar(value=True)
+		self.save_mods_json = ctk.CTkCheckBox(
+			self.save_options_frame,
+			text="Save mods.json",
+			variable=self.save_mods_json_var,
+			onvalue=True,
+			offvalue=False,
+		)
+		self.save_mods_json.pack(side="left", padx=10, pady=10)
+
+		self.save_mods_txt_var = ctk.BooleanVar(value=True)
+		self.save_mods_txt = ctk.CTkCheckBox(
+			self.save_options_frame,
+			text="Save mods.txt",
+			variable=self.save_mods_txt_var,
+			onvalue=True,
+			offvalue=False,
+		)
+		self.save_mods_txt.pack(side="left", padx=10, pady=10)
+
 		self.button_frame = ctk.CTkFrame(self.main_frame)
 		self.button_frame.pack(fill="x", padx=10, pady=(10, 0))
 
@@ -150,13 +183,23 @@ class ModManagerGUI(ctk.CTk):
 
 	def save_changes(self) -> None:
 		"""Save the changes to the mods."""
-		updated_mods = self.get_mod_status()
-		self.mod_manager.parse_mods(updated_mods)
+		try:
+			updated_mods = self.get_mod_status()
+			self.mod_manager.parse_mods(
+				mods=updated_mods,
+				save_enabled_txt=self.save_enabled_txt_var.get(),
+				save_mods_json=self.save_mods_json_var.get(),
+				save_mods_txt=self.save_mods_txt_var.get(),
+			)
 
-		enabled_count = sum(1 for mod in updated_mods if mod.enabled)
-		self.status_bar.configure(text=f"Changes saved. {enabled_count}/{len(updated_mods)} mods enabled.")
+			enabled_count = sum(1 for mod in updated_mods if mod.enabled)
+			self.status_bar.configure(text=f"Changes saved. {enabled_count}/{len(updated_mods)} mods enabled.")
 
-		logger.info(f"Saved changes to {len(updated_mods)} mods.")
+			logger.info(f"Saved changes to {len(updated_mods)} mods.")
+
+		except Exception as e:
+			logger.exception(f"Error saving changes: {e}")
+			self.show_error("Error Saving Changes", str(e))
 
 	def toggle_all_mods(self) -> None:
 		"""Toggle all mods on or off."""
@@ -168,6 +211,23 @@ class ModManagerGUI(ctk.CTk):
 			checkbox.select() if new_state else checkbox.deselect()
 
 		self.status_bar.configure(text=f"All mods {'enabled' if new_state else 'disabled'}. Click Save to apply.")
+
+	def show_error(self, title: str, message: str) -> None:
+		"""Show an error popup with the given title and message."""
+		error_window = ctk.CTkToplevel(self)
+		error_window.title(title)
+		error_window.geometry("400x200")
+		error_window.transient(self)
+		error_window.grab_set()
+
+		frame = ctk.CTkFrame(error_window)
+		frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+		error_label = ctk.CTkLabel(frame, text=message, wraplength=360, justify="left")
+		error_label.pack(padx=10, pady=(10, 20))
+
+		ok_button = ctk.CTkButton(frame, text="OK", command=error_window.destroy, width=100)
+		ok_button.pack(pady=(0, 10))
 
 
 def start_gui(mod_manager: UE4SSModManager, logo_path: Path | None = None, icon_path: Path | None = None) -> None:
