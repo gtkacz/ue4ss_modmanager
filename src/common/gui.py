@@ -36,9 +36,10 @@ class ModManagerGUI(ctk.CTk):
 		if icon_path and icon_path.exists():
 			try:
 				self.iconbitmap(icon_path)
-				logger.debug(f"Set window icon: {icon_path}")
+				#logger.debug(f"Set window icon: {icon_path}")
 			except Exception as e:
-				logger.error(f"Failed to set window icon: {e}")
+				pass
+				#logger.error(f"Failed to set window icon: {e}")
 
 		ctk.set_appearance_mode("dark")
 		ctk.set_default_color_theme("blue")
@@ -53,9 +54,9 @@ class ModManagerGUI(ctk.CTk):
 
 				self.logo_label = ctk.CTkLabel(self.main_frame, image=logo_image, text="")
 				self.logo_label.pack(pady=(0, 20))
-				logger.debug(f"Set logo image: {logo_path}")
+				#logger.debug(f"Set logo image: {logo_path}")
 			except Exception as e:
-				logger.error(f"Failed to load logo image: {e}")
+				#logger.error(f"Failed to load logo image: {e}")
 				self.title_label = ctk.CTkLabel(
 					self.main_frame,
 					text="UE4SS Mod Manager",
@@ -195,10 +196,10 @@ class ModManagerGUI(ctk.CTk):
 			enabled_count = sum(1 for mod in updated_mods if mod.enabled)
 			self.status_bar.configure(text=f"Changes saved. {enabled_count}/{len(updated_mods)} mods enabled.")
 
-			logger.info(f"Saved changes to {len(updated_mods)} mods.")
+			#logger.info(f"Saved changes to {len(updated_mods)} mods.")
 
 		except Exception as e:
-			logger.exception(f"Error saving changes: {e}")
+			#logger.exception(f"Error saving changes: {e}")
 			self.show_error("Error Saving Changes", str(e))
 
 	def toggle_all_mods(self) -> None:
