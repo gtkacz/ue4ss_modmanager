@@ -1,0 +1,81 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+from loguru import logger
+
+from src.common.exceptions import InvalidModException
+
+
+@dataclass
+class UE4SSMod:
+	"""Represents a UE4SS mod."""
+
+	name: str
+	path: Path
+	enabled: bool
+	scripts: list[str]
+
+	@classmethod
+	def from_path(cls, path: Path, *, override_enabled: bool = False) -> "UE4SSMod":
+		"""
+		Constructs a UE4SSMod object from a given path.
+
+		Args:
+			path: The path to the mod directory.
+			override_enabled (optional): If True, the mod will be considered enabled even if
+				there is no enabled.txt file. Defaults to False.
+
+		Raises:
+			InvalidModException: If the mod directory does not contain a main.lua file or if the directory
+				is not a directory.
+
+		Returns:
+			UE4SSMod: An instance of the UE4SSMod class with the mod's name, enabled status, and list of scripts.
+		"""
+		name = path.stem
+
+		if not path.is_dir():
+			logger.warning(f"Mod {name} is not a directory.")
+			return None
+
+		scripts = [
+			str(script).replace("/", "").replace("\\", "").split(name)[1][7:]
+			for script in path.glob("scripts/*.lua", case_sensitive=False)
+		]
+
+		if not scripts:
+			raise InvalidModException(f"Mod {name} has no scripts.")
+
+		if "main.lua" not in scripts:
+			raise InvalidModException(f"Mod {name} does not have a main.lua file: {scripts}")
+
+		enabled = (path / "enabled.txt").exists() or override_enabled
+
+		logger.debug(f"Mod {name} is {'enabled' if enabled else 'disabled'} with {len(scripts)} script(s)")
+
+		return cls(name=name, enabled=enabled, scripts=scripts, path=path)
+
+	def disable(self) -> None:
+		"""Disables the mod by removing the enabled.txt file."""
+		if self.enabled:
+			enabled_file = self.path / "enabled.txt"
+			if enabled_file.exists():
+				enabled_file.unlink()
+				logger.debug(f"Enabled file {enabled_file} removed.")
+			else:
+				logger.warning(f"Enabled file {enabled_file} does not exist.")
+			self.enabled = False
+			logger.debug(f"Mod {self.name} disabled.")
+		else:
+			logger.debug(f"Mod {self.name} is already disabled.")
+
+	def enable(self) -> None:
+		"""Enables the mod by creating an enabled.txt file."""
+		if not self.enabled:
+			enabled_file = self.path / "enabled.txt"
+			enabled_file.touch()
+			logger.debug(f"Enabled file {enabled_file} created.")
+			self.enabled = True
+			logger.debug(f"Mod {self.name} enabled.")
+		else:
+			logger.debug(f"Mod {self.name} is already enabled.")
