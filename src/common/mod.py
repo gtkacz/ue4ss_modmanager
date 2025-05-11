@@ -101,3 +101,12 @@ class UE4SSMod:
 			return False
 
 		return self.name == other.name
+
+	def __hash__(self) -> int:
+		"""
+		Returns the hash of the mod's name.
+
+		Returns:
+			The hash of the mod's name.
+		"""
+		return hash(self.name)

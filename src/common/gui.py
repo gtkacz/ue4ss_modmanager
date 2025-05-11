@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import customtkinter as ctk
 from loguru import logger
+from PIL import Image
 
 from src.common.mod import UE4SSMod
 from src.common.mod_manager import UE4SSModManager
@@ -8,12 +11,19 @@ from src.common.mod_manager import UE4SSModManager
 class ModManagerGUI(ctk.CTk):
 	"""A GUI for managing UE4SS mods."""
 
-	def __init__(self, mod_manager: UE4SSModManager) -> None:
+	def __init__(
+		self,
+		mod_manager: UE4SSModManager,
+		logo_path: Path | None = None,
+		icon_path: Path | None = None,
+	) -> None:
 		"""
 		Initialize the ModManagerGUI.
 
 		Args:
 			mod_manager: An instance of UE4SSModManager
+			logo_path: Path to the logo image file
+			icon_path: Path to the icon file (.ico)
 		"""
 		super().__init__()
 
@@ -23,18 +33,42 @@ class ModManagerGUI(ctk.CTk):
 		self.geometry("600x500")
 		self.minsize(400, 300)
 
+		if icon_path and icon_path.exists():
+			try:
+				self.iconbitmap(icon_path)
+				logger.debug(f"Set window icon: {icon_path}")
+			except Exception as e:
+				logger.error(f"Failed to set window icon: {e}")
+
 		ctk.set_appearance_mode("dark")
 		ctk.set_default_color_theme("blue")
 
 		self.main_frame = ctk.CTkFrame(self)
 		self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-		self.title_label = ctk.CTkLabel(
-			self.main_frame,
-			text="UE4SS Mod Manager",
-			font=ctk.CTkFont(size=24, weight="bold"),
-		)
-		self.title_label.pack(pady=(0, 20))
+		if logo_path and logo_path.exists():
+			try:
+				pil_image = Image.open(logo_path)
+				logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(200, 60))
+
+				self.logo_label = ctk.CTkLabel(self.main_frame, image=logo_image, text="")
+				self.logo_label.pack(pady=(0, 20))
+				logger.debug(f"Set logo image: {logo_path}")
+			except Exception as e:
+				logger.error(f"Failed to load logo image: {e}")
+				self.title_label = ctk.CTkLabel(
+					self.main_frame,
+					text="UE4SS Mod Manager",
+					font=ctk.CTkFont(size=24, weight="bold"),
+				)
+				self.title_label.pack(pady=(0, 20))
+		else:
+			self.title_label = ctk.CTkLabel(
+				self.main_frame,
+				text="UE4SS Mod Manager",
+				font=ctk.CTkFont(size=24, weight="bold"),
+			)
+			self.title_label.pack(pady=(0, 20))
 
 		self.mod_list_frame = ctk.CTkScrollableFrame(self.main_frame)
 		self.mod_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -136,12 +170,14 @@ class ModManagerGUI(ctk.CTk):
 		self.status_bar.configure(text=f"All mods {'enabled' if new_state else 'disabled'}. Click Save to apply.")
 
 
-def start_gui(mod_manager: UE4SSModManager) -> None:
+def start_gui(mod_manager: UE4SSModManager, logo_path: Path | None = None, icon_path: Path | None = None) -> None:
 	"""
 	Start the GUI with the given mod manager.
 
 	Args:
 		mod_manager: An instance of UE4SSModManager
+		logo_path: Path to the logo image file
+		icon_path: Path to the icon file (.ico)
 	"""
-	app = ModManagerGUI(mod_manager)
+	app = ModManagerGUI(mod_manager, logo_path, icon_path)
 	app.mainloop()

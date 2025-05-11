@@ -1,3 +1,4 @@
+from json import dumps, load
 from pathlib import Path
 
 from loguru import logger
@@ -21,10 +22,26 @@ class UE4SSModManager:
 		"""
 		self.path = path
 
+		enabled_overrides = self._get_enabled_overrides()
+
 		if not path.is_dir() or not path.exists() or not self._has_right_folder_structure(path):
 			raise InvalidModFolderException(f"Path {path} is not a directory.")
 
-		self.mods = self.load_mods()
+		self.mods = self.load_mods(enabled_overrides)
+
+	def _get_enabled_overrides(self) -> list[str]:
+		output = []
+
+		if (self.path / "mods.txt").exists():
+			with Path.open(self.path / "mods.txt", encoding="utf-8") as f:
+				output += [line.strip() for line in f.readlines() if line.strip().endswith("1")]
+
+		if (self.path / "mods.json").exists():
+			with Path.open(self.path / "mods.json", encoding="utf-8-sig") as f:
+				data = load(f)
+				output += [mod["mod_name"] for mod in data if mod.get("mod_enabled", False)]
+
+		return output
 
 	@staticmethod
 	def _has_right_folder_structure(path: Path) -> bool:
@@ -39,7 +56,7 @@ class UE4SSModManager:
 		"""
 		return path.stem.upper() == "MODS" and path.parent.stem.upper() == "UE4SS"
 
-	def load_mods(self) -> list[UE4SSMod]:
+	def load_mods(self, enabled_overrides: list[str] | None = None) -> list[UE4SSMod]:
 		"""
 		Loads all mods from the specified path.
 
@@ -48,10 +65,14 @@ class UE4SSModManager:
 		"""
 		output = []
 
+		if enabled_overrides is None:
+			enabled_overrides = []
+
 		for mod_path in self.path.iterdir():
-			if mod_path.is_dir():
+			if mod_path.is_dir() and mod_path.stem.upper() != "SHARED":
 				try:
-					mod = UE4SSMod.from_path(mod_path)
+					override_enabled = mod_path.stem in enabled_overrides
+					mod = UE4SSMod.from_path(mod_path, override_enabled=override_enabled)
 					if mod:
 						output.append(mod)
 				except Exception as e:
@@ -71,6 +92,40 @@ class UE4SSModManager:
 			if mod.name in mod_names:
 				mod.disable()
 
+	def _write_to_mods_json(self, mods: list[UE4SSMod]) -> None:
+		"""
+		Writes the enabled mods to the mods.json file.
+
+		Args:
+			mods: A list of UE4SSMod objects to write to the mods.json file.
+		"""
+		output = [{"mod_name": mod.name, "mod_enabled": mod.enabled} for mod in mods if mod.enabled]
+		json_path = self.path / "mods.json"
+
+		if json_path.exists():
+			json_path.unlink()
+
+		with Path.open(json_path, "w", encoding="utf-8") as f:
+			f.write(dumps(output, indent=4, ensure_ascii=False))
+			logger.debug(f"Enabled mods written to {json_path}")
+
+	def _write_to_mods_txt(self, mods: list[UE4SSMod]) -> None:
+		"""
+		Writes the enabled mods to the mods.txt file.
+
+		Args:
+			mods: A list of UE4SSMod objects to write to the mods.txt file.
+		"""
+		output = [f"{mod.name} : 1\n" for mod in mods if mod.enabled]
+		txt_path = self.path / "mods.txt"
+
+		if txt_path.exists():
+			txt_path.unlink()
+
+		with Path.open(txt_path, "w", encoding="utf-8") as f:
+			f.writelines(output)
+			logger.debug(f"Enabled mods written to {txt_path}")
+
 	def parse_mods(self, mods: list[UE4SSMod]) -> None:
 		"""
 		Parses the mods and sets their enabled status.
@@ -78,16 +133,20 @@ class UE4SSModManager:
 		Args:
 			mods: A list of UE4SSMod objects to parse.
 		"""
-		for mod in mods:
-			if mod not in self.mods:
-				logger.warning(f"Mod {mod.name} not found.")
-				continue
+		enabled_mods = [mod for mod in mods if mod.enabled]
+		disabled_mods = [mod for mod in mods if not mod.enabled]
 
-			if mod.enabled:
-				self.enable_mods([mod.name])
+		self._write_to_mods_json(enabled_mods)
+		self._write_to_mods_txt(enabled_mods)
 
-			else:
-				self.disable_mods([mod.name])
+		if enabled_mods:
+			for mod in enabled_mods:
+				mod.enable()
+
+		if disabled_mods:
+			for mod in disabled_mods:
+				mod.disable()
+
 		logger.debug(f"Parsed {len(mods)} mods.")
 
 	@property
