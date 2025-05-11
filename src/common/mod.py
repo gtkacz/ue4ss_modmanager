@@ -30,7 +30,7 @@ class UE4SSMod:
 				is not a directory.
 
 		Returns:
-			UE4SSMod: An instance of the UE4SSMod class with the mod's name, enabled status, and list of scripts.
+			An instance of the UE4SSMod class with the mod's name, enabled status, and list of scripts.
 		"""
 		name = path.stem
 
@@ -59,13 +59,18 @@ class UE4SSMod:
 		"""Disables the mod by removing the enabled.txt file."""
 		if self.enabled:
 			enabled_file = self.path / "enabled.txt"
+
 			if enabled_file.exists():
 				enabled_file.unlink()
 				logger.debug(f"Enabled file {enabled_file} removed.")
+
 			else:
 				logger.warning(f"Enabled file {enabled_file} does not exist.")
+
 			self.enabled = False
+
 			logger.debug(f"Mod {self.name} disabled.")
+
 		else:
 			logger.debug(f"Mod {self.name} is already disabled.")
 
@@ -74,8 +79,10 @@ class UE4SSMod:
 		if not self.enabled:
 			enabled_file = self.path / "enabled.txt"
 			enabled_file.touch()
-			logger.debug(f"Enabled file {enabled_file} created.")
+
 			self.enabled = True
-			logger.debug(f"Mod {self.name} enabled.")
+
+			logger.debug(f"Enabled file {enabled_file} created. Mod {self.name} enabled.")
+
 		else:
 			logger.debug(f"Mod {self.name} is already enabled.")
