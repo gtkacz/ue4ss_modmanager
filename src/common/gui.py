@@ -11,27 +11,47 @@ from src.common.mod_manager import UE4SSModManager
 class UE4SSModManagerGUI(ctk.CTk):
 	"""A GUI for managing UE4SS mods."""
 
-	def __init__(  # noqa: PLR0915
+	def __init__(
 		self,
 		mod_manager: UE4SSModManager,
 		logo_path: Path | None = None,
 		icon_path: Path | None = None,
 	) -> None:
-		"""
-		Initialize the UE4SSModManagerGUI.
-
-		Args:
-			mod_manager: An instance of UE4SSModManager
-			logo_path: Path to the logo image file
-			icon_path: Path to the icon file (.ico)
-		"""
+		"""Initialize the UE4SSModManagerGUI."""
 		super().__init__()
-		size_mod = 0.6
 
 		self.mod_manager = mod_manager
+		self.initial_mod_states = {mod.name: mod.enabled for mod in mod_manager.mods}
+		self.mod_checkboxes = {}
+		self.show_native_warning_shown = False
 
+		self._setup_window(icon_path)
+		self._setup_theme()
+
+		self.main_frame = ctk.CTkFrame(self)
+		self.main_frame.pack(fill="both", expand=True, padx=15, pady=15)
+
+		self._create_header(logo_path)
+		self._create_search_filter()
+		self._create_controls()
+		self._create_mod_list()
+		self._create_save_options()
+		self._create_status_bar()
+
+		self.populate_mod_list()
+		self.update_save_button_state()
+
+	def _setup_window(self, icon_path: Path | None = None) -> None:
+		"""Configure the window properties."""
 		self.title("UE4SS Mod Manager")
-		self.minsize(1920 * size_mod, 1300 * size_mod)
+
+		# Make window size dynamic based on screen size
+		screen_width = self.winfo_screenwidth()
+		screen_height = self.winfo_screenheight()
+		window_width = int(screen_width * 0.6)
+		window_height = int(screen_height * 0.6)
+		self.minsize(window_width, window_height)
+
 		self.attributes("-topmost", True)
 		self.after(100, lambda: self.attributes("-topmost", False))
 		self.center_window()
@@ -43,49 +63,52 @@ class UE4SSModManagerGUI(ctk.CTk):
 			except Exception as e:
 				logger.error(f"Failed to set window icon: {e}")
 
+	@staticmethod
+	def _setup_theme() -> None:
+		"""Set up the application theme."""
 		ctk.set_appearance_mode("dark")
 		ctk.set_default_color_theme("blue")
 
-		self.main_frame = ctk.CTkFrame(self)
-		self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
+	def _create_header(self, logo_path: Path | None = None) -> None:
+		"""Create the header with logo or title."""
 		if logo_path and logo_path.exists():
 			try:
 				pil_image = Image.open(logo_path)
-				logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(200, 60))
-
+				logo_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(180, 54))
 				self.logo_label = ctk.CTkLabel(self.main_frame, image=logo_image, text="")
-				self.logo_label.pack(pady=(0, 20))
+				self.logo_label.pack(pady=(0, 15))
 				logger.debug(f"Set logo image: {logo_path}")
 			except Exception as e:
 				logger.error(f"Failed to load logo image: {e}")
-				self.title_label = ctk.CTkLabel(
-					self.main_frame,
-					text="UE4SS Mod Manager",
-					font=ctk.CTkFont(size=24, weight="bold"),
-				)
-				self.title_label.pack(pady=(0, 20))
+				self._create_title_label()
 		else:
-			self.title_label = ctk.CTkLabel(
-				self.main_frame,
-				text="UE4SS Mod Manager",
-				font=ctk.CTkFont(size=24, weight="bold"),
-			)
-			self.title_label.pack(pady=(0, 20))
+			self._create_title_label()
 
 		self.header_frame = ctk.CTkFrame(self.main_frame)
-		self.header_frame.pack(fill="x", padx=10, pady=(0, 10))
+		self.header_frame.pack(fill="x", padx=10, pady=(0, 5))
 		self.separator1 = ctk.CTkFrame(self.main_frame, height=1, fg_color="gray30")
-		self.separator1.pack(fill="x", padx=10, pady=5)
+		self.separator1.pack(fill="x", padx=10, pady=3)
 
+	def _create_title_label(self) -> None:
+		"""Create the title label if no logo is available."""
+		self.title_label = ctk.CTkLabel(
+			self.main_frame,
+			text="UE4SS Mod Manager",
+			font=ctk.CTkFont(size=24, weight="bold"),
+		)
+		self.title_label.pack(pady=(0, 15))
+
+	def _create_search_filter(self) -> None:
+		"""Create the search filter components."""
 		self.list_label = ctk.CTkLabel(
 			self.header_frame,
 			text="Available Mods:",
 			font=ctk.CTkFont(size=16, weight="bold"),
 		)
 		self.list_label.pack(side="left", padx=10, pady=5)
+
 		self.search_var = ctk.StringVar()
-		self.search_var.trace_add("write", lambda name, index, mode: self.filter_mods())
+		self.search_var.trace_add("write", lambda *_: self.filter_mods())
 		self.search_entry = ctk.CTkEntry(
 			self.header_frame,
 			placeholder_text="Search mods...",
@@ -94,9 +117,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		self.search_entry.pack(side="left", padx=10, pady=5)
 
-		self.show_native_warning_shown = False
 		self.show_native_mods_var = ctk.BooleanVar(value=False)
-
 		self.show_native_switch = ctk.CTkSwitch(
 			self.header_frame,
 			text="Show Native Mods",
@@ -107,6 +128,8 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		self.show_native_switch.pack(side="right", padx=10, pady=5)
 
+	def _create_controls(self) -> None:
+		"""Create the control buttons section."""
 		self.controls_frame = ctk.CTkFrame(self.main_frame)
 		self.controls_frame.pack(fill="x", padx=10, pady=(0, 5))
 
@@ -138,16 +161,17 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		self.reset_button.pack(side="right", padx=5, pady=5)
 
+	def _create_mod_list(self) -> None:
+		"""Create the scrollable mod list area."""
 		self.mod_list_frame = ctk.CTkScrollableFrame(self.main_frame)
-		self.mod_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+		self.mod_list_frame.pack(fill="both", expand=True, padx=10, pady=8)
 		self.separator2 = ctk.CTkFrame(self.main_frame, height=1, fg_color="gray30")
-		self.separator2.pack(fill="x", padx=10, pady=5)
+		self.separator2.pack(fill="x", padx=10, pady=3)
 
-		self.mod_checkboxes = {}
-		self.initial_mod_states = {mod.name: mod.enabled for mod in mod_manager.mods}
-
+	def _create_save_options(self) -> None:
+		"""Create the save options section."""
 		self.save_options_frame = ctk.CTkFrame(self.main_frame)
-		self.save_options_frame.pack(fill="x", padx=10, pady=(10, 0))
+		self.save_options_frame.pack(fill="x", padx=10, pady=(8, 0))
 
 		self.save_enabled_txt_var = ctk.BooleanVar(value=True)
 		self.save_enabled_txt = ctk.CTkSwitch(
@@ -159,7 +183,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 			command=self.update_save_button_state,
 			width=24,
 		)
-		self.save_enabled_txt.pack(side="left", padx=10, pady=10)
+		self.save_enabled_txt.pack(side="left", padx=10, pady=8)
 
 		self.save_mods_json_var = ctk.BooleanVar(value=False)
 		self.save_mods_json = ctk.CTkSwitch(
@@ -168,10 +192,10 @@ class UE4SSModManagerGUI(ctk.CTk):
 			variable=self.save_mods_json_var,
 			onvalue=True,
 			offvalue=False,
-			command=self.update_save_button_state,
+			command=lambda: self.handle_save_option_change(self.save_mods_json_var),
 			width=24,
 		)
-		self.save_mods_json.pack(side="left", padx=10, pady=10)
+		self.save_mods_json.pack(side="left", padx=10, pady=8)
 
 		self.save_mods_txt_var = ctk.BooleanVar(value=False)
 		self.save_mods_txt = ctk.CTkSwitch(
@@ -180,13 +204,10 @@ class UE4SSModManagerGUI(ctk.CTk):
 			variable=self.save_mods_txt_var,
 			onvalue=True,
 			offvalue=False,
-			command=self.update_save_button_state,
+			command=lambda: self.handle_save_option_change(self.save_mods_txt_var),
 			width=24,
 		)
-		self.save_mods_txt.pack(side="left", padx=10, pady=10)
-
-		self.save_mods_json.configure(command=lambda: self.handle_save_option_change(self.save_mods_json_var))
-		self.save_mods_txt.configure(command=lambda: self.handle_save_option_change(self.save_mods_txt_var))
+		self.save_mods_txt.pack(side="left", padx=10, pady=8)
 
 		self.spacer = ctk.CTkLabel(self.save_options_frame, text="")
 		self.spacer.pack(side="left", fill="x", expand=True)
@@ -194,17 +215,16 @@ class UE4SSModManagerGUI(ctk.CTk):
 		self.save_button = ctk.CTkButton(
 			self.save_options_frame, text="Save Changes", command=self.save_changes, width=120, state="disabled"
 		)
-		self.save_button.pack(side="right", padx=10, pady=10)
+		self.save_button.pack(side="right", padx=10, pady=8)
 
+	def _create_status_bar(self) -> None:
+		"""Create the status bar at the bottom."""
 		self.status_bar = ctk.CTkLabel(
 			self.main_frame,
 			text=f"Loaded {len(self.mod_manager.mods)} mods",
 			font=ctk.CTkFont(size=12),
 		)
-		self.status_bar.pack(pady=(10, 50), anchor="w")
-
-		self.populate_mod_list()
-		self.update_save_button_state()
+		self.status_bar.pack(pady=(8, 0), anchor="w")
 
 	def toggle_native_mods_visibility(self) -> None:
 		"""Toggle visibility of native mods with a warning."""
@@ -363,7 +383,29 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		ok_button.pack(side="right", padx=10, pady=10)
 
-	def get_mod_status(self) -> list[UE4SSMod]:
+	def get_mod_status(self) -> dict[str, bool]:
+		"""
+		Get the current status of all mods from the checkboxes.
+
+		Returns:
+			A mapping with mod names as keys and their enabled status as values.
+		"""
+		try:
+			mod_status = {}
+			for mod in self.mod_manager.mods:
+				checkbox = self.mod_checkboxes.get(mod.name)
+				if checkbox:
+					mod_status[mod.name] = checkbox.get()
+
+		except Exception as e:
+			logger.exception(f"Error getting mod status: {e}")
+			self.show_error("Error Getting Mod Status", str(e))
+			return {}
+
+		else:
+			return mod_status
+
+	def get_mod_objects(self) -> list[UE4SSMod]:
 		"""
 		Get the current status of all mods from the checkboxes.
 
@@ -392,7 +434,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 	def save_changes(self) -> None:
 		"""Save the changes to the mods."""
 		try:
-			updated_mods = self.get_mod_status()
+			updated_mods = self.get_mod_objects()
 			self.mod_manager.parse_mods(
 				mods=updated_mods,
 				save_enabled_txt=self.save_enabled_txt_var.get(),
@@ -403,7 +445,8 @@ class UE4SSModManagerGUI(ctk.CTk):
 			enabled_count = sum(1 for mod in updated_mods if mod.enabled)
 			self.status_bar.configure(text=f"Changes saved. {enabled_count}/{len(updated_mods)} mods enabled.")
 
-			logger.info(f"Saved changes to {len(updated_mods)} mods.")
+			self.initial_mod_states = self.get_mod_status()
+			self.update_save_button_state()
 
 		except Exception as e:
 			logger.exception(f"Error saving changes: {e}")
