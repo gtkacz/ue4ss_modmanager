@@ -26,13 +26,14 @@ class UE4SSModManagerGUI(ctk.CTk):
 			icon_path: Path to the icon file (.ico)
 		"""
 		super().__init__()
+		size_mod = 0.6
 
 		self.mod_manager = mod_manager
 
 		self.title("UE4SS Mod Manager")
-		self.geometry("600x500")
-		self.minsize(400, 300)
+		self.minsize(1920 * size_mod, 1300 * size_mod)
 		self.attributes("-topmost", True)
+		self.after(100, lambda: self.attributes("-topmost", False))
 		self.center_window()
 
 		if icon_path and icon_path.exists():
@@ -74,6 +75,8 @@ class UE4SSModManagerGUI(ctk.CTk):
 
 		self.header_frame = ctk.CTkFrame(self.main_frame)
 		self.header_frame.pack(fill="x", padx=10, pady=(0, 10))
+		self.separator1 = ctk.CTkFrame(self.main_frame, height=1, fg_color="gray30")
+		self.separator1.pack(fill="x", padx=10, pady=5)
 
 		self.list_label = ctk.CTkLabel(
 			self.header_frame,
@@ -81,6 +84,15 @@ class UE4SSModManagerGUI(ctk.CTk):
 			font=ctk.CTkFont(size=16, weight="bold"),
 		)
 		self.list_label.pack(side="left", padx=10, pady=5)
+		self.search_var = ctk.StringVar()
+		self.search_var.trace_add("write", lambda name, index, mode: self.filter_mods())
+		self.search_entry = ctk.CTkEntry(
+			self.header_frame,
+			placeholder_text="Search mods...",
+			textvariable=self.search_var,
+			width=200,
+		)
+		self.search_entry.pack(side="left", padx=10, pady=5)
 
 		self.show_native_warning_shown = False
 		self.show_native_mods_var = ctk.BooleanVar(value=False)
@@ -95,19 +107,50 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		self.show_native_switch.pack(side="right", padx=10, pady=5)
 
+		self.controls_frame = ctk.CTkFrame(self.main_frame)
+		self.controls_frame.pack(fill="x", padx=10, pady=(0, 5))
+
+		self.toggle_all_var = ctk.BooleanVar(value=False)
+		self.toggle_all_checkbox = ctk.CTkCheckBox(
+			self.controls_frame,
+			text="Toggle All",
+			variable=self.toggle_all_var,
+			onvalue=True,
+			offvalue=False,
+			command=self.toggle_all_mods,
+			width=24,
+		)
+		self.toggle_all_checkbox.pack(side="left", padx=10, pady=5)
+
+		self.refresh_button = ctk.CTkButton(
+			self.controls_frame,
+			text="Refresh",
+			command=self.refresh_mods,
+			width=80,
+		)
+		self.refresh_button.pack(side="right", padx=5, pady=5)
+
+		self.reset_button = ctk.CTkButton(
+			self.controls_frame,
+			text="Reset",
+			command=self.reset_mods,
+			width=80,
+		)
+		self.reset_button.pack(side="right", padx=5, pady=5)
+
 		self.mod_list_frame = ctk.CTkScrollableFrame(self.main_frame)
 		self.mod_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+		self.separator2 = ctk.CTkFrame(self.main_frame, height=1, fg_color="gray30")
+		self.separator2.pack(fill="x", padx=10, pady=5)
 
 		self.mod_checkboxes = {}
 		self.initial_mod_states = {mod.name: mod.enabled for mod in mod_manager.mods}
-
-		self.populate_mod_list()
 
 		self.save_options_frame = ctk.CTkFrame(self.main_frame)
 		self.save_options_frame.pack(fill="x", padx=10, pady=(10, 0))
 
 		self.save_enabled_txt_var = ctk.BooleanVar(value=True)
-		self.save_enabled_txt = ctk.CTkCheckBox(
+		self.save_enabled_txt = ctk.CTkSwitch(
 			self.save_options_frame,
 			text="Save enabled.txt",
 			variable=self.save_enabled_txt_var,
@@ -119,7 +162,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		self.save_enabled_txt.pack(side="left", padx=10, pady=10)
 
 		self.save_mods_json_var = ctk.BooleanVar(value=False)
-		self.save_mods_json = ctk.CTkCheckBox(
+		self.save_mods_json = ctk.CTkSwitch(
 			self.save_options_frame,
 			text="Save mods.json",
 			variable=self.save_mods_json_var,
@@ -131,7 +174,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		self.save_mods_json.pack(side="left", padx=10, pady=10)
 
 		self.save_mods_txt_var = ctk.BooleanVar(value=False)
-		self.save_mods_txt = ctk.CTkCheckBox(
+		self.save_mods_txt = ctk.CTkSwitch(
 			self.save_options_frame,
 			text="Save mods.txt",
 			variable=self.save_mods_txt_var,
@@ -145,35 +188,12 @@ class UE4SSModManagerGUI(ctk.CTk):
 		self.save_mods_json.configure(command=lambda: self.handle_save_option_change(self.save_mods_json_var))
 		self.save_mods_txt.configure(command=lambda: self.handle_save_option_change(self.save_mods_txt_var))
 
-		self.button_frame = ctk.CTkFrame(self.main_frame)
-		self.button_frame.pack(fill="x", padx=10, pady=(10, 0))
+		self.spacer = ctk.CTkLabel(self.save_options_frame, text="")
+		self.spacer.pack(side="left", fill="x", expand=True)
 
-		self.toggle_all_button = ctk.CTkButton(
-			self.button_frame,
-			text="Toggle All",
-			command=self.toggle_all_mods,
-			width=120,
+		self.save_button = ctk.CTkButton(
+			self.save_options_frame, text="Save Changes", command=self.save_changes, width=120, state="disabled"
 		)
-		self.toggle_all_button.pack(side="left", padx=10, pady=10)
-		self.reset_button = ctk.CTkButton(
-			self.button_frame,
-			text="Reset",
-			command=self.reset_mods,
-			width=120,
-		)
-		self.reset_button.pack(side="left", padx=10, pady=10)
-		self.refresh_button = ctk.CTkButton(
-			self.button_frame,
-			text="Refresh",
-			command=self.refresh_mods,
-			width=120,
-		)
-		self.refresh_button.pack(side="left", padx=10, pady=10)
-
-		# self.spacer = ctk.CTkLabel(self.button_frame, text="")
-		# self.spacer.pack(side="left", fill="x", expand=True)
-
-		self.save_button = ctk.CTkButton(self.button_frame, text="Save Changes", command=self.save_changes, width=120)
 		self.save_button.pack(side="right", padx=10, pady=10)
 
 		self.status_bar = ctk.CTkLabel(
@@ -183,6 +203,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		)
 		self.status_bar.pack(pady=(10, 50), anchor="w")
 
+		self.populate_mod_list()
 		self.update_save_button_state()
 
 	def toggle_native_mods_visibility(self) -> None:
@@ -201,7 +222,10 @@ class UE4SSModManagerGUI(ctk.CTk):
 
 	def update_save_button_state(self) -> None:
 		"""Update the save button state based on save options."""
-		if not (self.save_enabled_txt_var.get() or self.save_mods_json_var.get() or self.save_mods_txt_var.get()):
+		if (
+			not (self.save_enabled_txt_var.get() or self.save_mods_json_var.get() or self.save_mods_txt_var.get())
+			or self.initial_mod_states == self.get_mod_status()
+		):
 			self.save_button.configure(state="disabled")
 		else:
 			self.save_button.configure(state="normal")
@@ -214,6 +238,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 			self.populate_mod_list()
 
 			self.status_bar.configure(text=f"Refreshed {len(self.mod_manager.mods)} mods")
+
 		except Exception as e:
 			logger.exception(f"Error refreshing mods: {e}")
 			self.show_error("Error Refreshing Mods", str(e))
@@ -237,6 +262,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 					frame,
 					text=f"{'[NATIVE] ' if mod.is_native else ''}{mod.name}",
 					variable=ctk.BooleanVar(value=mod.enabled),
+					command=self.update_save_button_state,
 					onvalue=True,
 					offvalue=False,
 					width=24,
@@ -252,6 +278,16 @@ class UE4SSModManagerGUI(ctk.CTk):
 				script_count.pack(side="right", padx=10, pady=5)
 
 				self.mod_checkboxes[mod.name] = checkbox
+
+			visible_count = sum(
+				1 for mod in self.mod_manager.mods if not mod.is_native or self.show_native_mods_var.get()
+			)
+			enabled_count = sum(
+				1
+				for mod in self.mod_manager.mods
+				if mod.enabled and (not mod.is_native or self.show_native_mods_var.get())
+			)
+			self.status_bar.configure(text=f"Showing {visible_count} mods ({enabled_count} enabled)")
 
 		except Exception as e:
 			logger.exception(f"Error saving changes: {e}")
@@ -294,6 +330,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		warning_window.transient(self)
 		warning_window.grab_set()
 		warning_window.attributes("-topmost", True)
+		warning_window.after(100, lambda: warning_window.attributes("-topmost", False))
 		warning_window.update_idletasks()
 		width = warning_window.winfo_width()
 		height = warning_window.winfo_height()
@@ -373,20 +410,32 @@ class UE4SSModManagerGUI(ctk.CTk):
 			self.show_error("Error Saving Changes", str(e))
 
 	def toggle_all_mods(self) -> None:
-		"""Toggle all mods on or off."""
+		"""Toggle all mods on or off based on the Toggle All checkbox."""
 		try:
-			enabled_count = sum(1 for checkbox in self.mod_checkboxes.values() if checkbox.get())
-			total_count = len(self.mod_checkboxes)
-			new_state = enabled_count <= total_count / 2
+			new_state = self.toggle_all_var.get()
 
 			for checkbox in self.mod_checkboxes.values():
-				checkbox.select() if new_state else checkbox.deselect()
+				if new_state:
+					checkbox.select()
+				else:
+					checkbox.deselect()
 
 			self.status_bar.configure(text=f"All mods {'enabled' if new_state else 'disabled'}. Click Save to apply.")
 
 		except Exception as e:
-			logger.exception(f"Error saving changes: {e}")
-			self.show_error("Error Saving Changes", str(e))
+			logger.exception(f"Error toggling mods: {e}")
+			self.show_error("Error Toggling Mods", str(e))
+
+	def filter_mods(self) -> None:
+		"""Filter mods based on search text."""
+		search_text = self.search_var.get().lower()
+
+		for mod_name, checkbox in self.mod_checkboxes.items():
+			parent_frame = checkbox.master
+			if search_text in mod_name.lower():
+				parent_frame.pack(fill="x", padx=5, pady=2)
+			else:
+				parent_frame.pack_forget()
 
 	def center_window(self) -> None:
 		"""Center the window on the screen."""
@@ -405,6 +454,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 		error_window.transient(self)
 		error_window.grab_set()
 		error_window.attributes("-topmost", True)
+		error_window.after(100, lambda: error_window.attributes("-topmost", False))
 		error_window.update_idletasks()
 		width = error_window.winfo_width()
 		height = error_window.winfo_height()
