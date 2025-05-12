@@ -32,6 +32,8 @@ class UE4SSModManagerGUI(ctk.CTk):
 		self.title("UE4SS Mod Manager")
 		self.geometry("600x500")
 		self.minsize(400, 300)
+		self.attributes("-topmost", True)
+		self.center_window()
 
 		if icon_path and icon_path.exists():
 			try:
@@ -70,13 +72,34 @@ class UE4SSModManagerGUI(ctk.CTk):
 			)
 			self.title_label.pack(pady=(0, 20))
 
+		self.header_frame = ctk.CTkFrame(self.main_frame)
+		self.header_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+		self.list_label = ctk.CTkLabel(
+			self.header_frame,
+			text="Available Mods:",
+			font=ctk.CTkFont(size=16, weight="bold"),
+		)
+		self.list_label.pack(side="left", padx=10, pady=5)
+
+		self.show_native_warning_shown = False
+		self.show_native_mods_var = ctk.BooleanVar(value=False)
+
+		self.show_native_switch = ctk.CTkSwitch(
+			self.header_frame,
+			text="Show Native Mods",
+			variable=self.show_native_mods_var,
+			onvalue=True,
+			offvalue=False,
+			command=self.toggle_native_mods_visibility,
+		)
+		self.show_native_switch.pack(side="right", padx=10, pady=5)
+
 		self.mod_list_frame = ctk.CTkScrollableFrame(self.main_frame)
 		self.mod_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
 		self.mod_checkboxes = {}
-
-		self.show_native_warning_shown = False
-		self.show_native_mods_var = ctk.BooleanVar(value=False)
+		self.initial_mod_states = {mod.name: mod.enabled for mod in mod_manager.mods}
 
 		self.populate_mod_list()
 
@@ -132,9 +155,23 @@ class UE4SSModManagerGUI(ctk.CTk):
 			width=120,
 		)
 		self.toggle_all_button.pack(side="left", padx=10, pady=10)
+		self.reset_button = ctk.CTkButton(
+			self.button_frame,
+			text="Reset",
+			command=self.reset_mods,
+			width=120,
+		)
+		self.reset_button.pack(side="left", padx=10, pady=10)
+		self.refresh_button = ctk.CTkButton(
+			self.button_frame,
+			text="Refresh",
+			command=self.refresh_mods,
+			width=120,
+		)
+		self.refresh_button.pack(side="left", padx=10, pady=10)
 
-		self.spacer = ctk.CTkLabel(self.button_frame, text="")
-		self.spacer.pack(side="left", fill="x", expand=True)
+		# self.spacer = ctk.CTkLabel(self.button_frame, text="")
+		# self.spacer.pack(side="left", fill="x", expand=True)
 
 		self.save_button = ctk.CTkButton(self.button_frame, text="Save Changes", command=self.save_changes, width=120)
 		self.save_button.pack(side="right", padx=10, pady=10)
@@ -145,16 +182,6 @@ class UE4SSModManagerGUI(ctk.CTk):
 			font=ctk.CTkFont(size=12),
 		)
 		self.status_bar.pack(pady=(10, 50), anchor="w")
-
-		self.show_native_switch = ctk.CTkSwitch(
-			self.save_options_frame,
-			text="Show Native Mods",
-			variable=self.show_native_mods_var,
-			onvalue=True,
-			offvalue=False,
-			command=self.toggle_native_mods_visibility,
-		)
-		self.show_native_switch.pack(side="right", padx=10, pady=10)
 
 		self.update_save_button_state()
 
@@ -179,6 +206,18 @@ class UE4SSModManagerGUI(ctk.CTk):
 		else:
 			self.save_button.configure(state="normal")
 
+	def refresh_mods(self) -> None:
+		"""Reload mods from disk."""
+		try:
+			self.mod_manager.mods = self.mod_manager.load_mods()
+			self.initial_mod_states = {mod.name: mod.enabled for mod in self.mod_manager.mods}
+			self.populate_mod_list()
+
+			self.status_bar.configure(text=f"Refreshed {len(self.mod_manager.mods)} mods")
+		except Exception as e:
+			logger.exception(f"Error refreshing mods: {e}")
+			self.show_error("Error Refreshing Mods", str(e))
+
 	def populate_mod_list(self) -> None:
 		"""Populate the mod list with checkboxes for each mod."""
 		try:
@@ -196,7 +235,7 @@ class UE4SSModManagerGUI(ctk.CTk):
 
 				checkbox = ctk.CTkCheckBox(
 					frame,
-					text=mod.name + (" [NATIVE]" if mod.is_native else ""),
+					text=f"{'[NATIVE] ' if mod.is_native else ''}{mod.name}",
 					variable=ctk.BooleanVar(value=mod.enabled),
 					onvalue=True,
 					offvalue=False,
@@ -231,6 +270,22 @@ class UE4SSModManagerGUI(ctk.CTk):
 
 		self.update_save_button_state()
 
+	def reset_mods(self) -> None:
+		"""Reset mods to their initial states when the app was launched."""
+		try:
+			for mod_name, checkbox in self.mod_checkboxes.items():
+				initial_state = self.initial_mod_states.get(mod_name, False)
+				if initial_state:
+					checkbox.select()
+				else:
+					checkbox.deselect()
+
+			self.status_bar.configure(text="Mods reset to initial state. Click Save to apply.")
+
+		except Exception as e:
+			logger.exception(f"Error resetting mods: {e}")
+			self.show_error("Error Resetting Mods", str(e))
+
 	def show_warning(self, title: str, message: str, on_ok: callable, on_cancel: callable) -> None:
 		"""Show a warning popup with OK and Cancel buttons."""
 		warning_window = ctk.CTkToplevel(self)
@@ -238,6 +293,13 @@ class UE4SSModManagerGUI(ctk.CTk):
 		warning_window.geometry("450x200")
 		warning_window.transient(self)
 		warning_window.grab_set()
+		warning_window.attributes("-topmost", True)
+		warning_window.update_idletasks()
+		width = warning_window.winfo_width()
+		height = warning_window.winfo_height()
+		x = (warning_window.winfo_screenwidth() // 2) - (width // 2)
+		y = (warning_window.winfo_screenheight() // 2) - (height // 2)
+		warning_window.geometry(f"{width}x{height}+{x}+{y}")
 
 		frame = ctk.CTkFrame(warning_window)
 		frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -326,6 +388,15 @@ class UE4SSModManagerGUI(ctk.CTk):
 			logger.exception(f"Error saving changes: {e}")
 			self.show_error("Error Saving Changes", str(e))
 
+	def center_window(self) -> None:
+		"""Center the window on the screen."""
+		self.update_idletasks()
+		width = self.winfo_width()
+		height = self.winfo_height()
+		x = (self.winfo_screenwidth() // 2) - (width // 2)
+		y = (self.winfo_screenheight() // 2) - (height // 2)
+		self.geometry(f"{width}x{height}+{x}+{y}")
+
 	def show_error(self, title: str, message: str) -> None:
 		"""Show an error popup with the given title and message."""
 		error_window = ctk.CTkToplevel(self)
@@ -333,6 +404,13 @@ class UE4SSModManagerGUI(ctk.CTk):
 		error_window.geometry("400x200")
 		error_window.transient(self)
 		error_window.grab_set()
+		error_window.attributes("-topmost", True)
+		error_window.update_idletasks()
+		width = error_window.winfo_width()
+		height = error_window.winfo_height()
+		x = (error_window.winfo_screenwidth() // 2) - (width // 2)
+		y = (error_window.winfo_screenheight() // 2) - (height // 2)
+		error_window.geometry(f"{width}x{height}+{x}+{y}")
 
 		frame = ctk.CTkFrame(error_window)
 		frame.pack(fill="both", expand=True, padx=20, pady=20)
