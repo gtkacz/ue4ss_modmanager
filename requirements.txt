@@ -1,3 +1,2 @@
 customtkinter
-auto-py-to-exe
 loguru

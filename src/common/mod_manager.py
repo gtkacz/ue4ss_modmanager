@@ -1,12 +1,24 @@
 from json import dumps, load
 from pathlib import Path
 
+from loguru import logger
+
 from src.common.exceptions import InvalidModFolderException
 from src.common.mod import UE4SSMod
 
 
 class UE4SSModManager:
 	"""Manages the loading and enabling/disabling of UE4SS mods."""
+
+	NATIVE_MODS = (
+		"BPML_GenericFunctions",
+		"BPModLoaderMod",
+		"CheatManagerEnablerMod",
+		"ConsoleCommandsMod",
+		"ConsoleEnablerMod",
+		"Keybinds",
+		"ConsoleCommands",
+	)
 
 	def __init__(self, path: Path) -> None:
 		"""
@@ -72,10 +84,11 @@ class UE4SSModManager:
 					override_enabled = mod_path.stem in enabled_overrides
 					mod = UE4SSMod.from_path(mod_path, override_enabled=override_enabled)
 					if mod:
+						mod.is_native = mod.name in self.NATIVE_MODS
 						output.append(mod)
 				except Exception:
-					pass
-					# logger.exception(f"Failed to load mod {mod_path}: {e}")
+					logger.exception(f"Failed to load mod from {mod_path}. This mod will be skipped.")
+					continue
 
 		return output
 
@@ -106,7 +119,7 @@ class UE4SSModManager:
 
 		with Path.open(json_path, "w", encoding="utf-8") as f:
 			f.write(dumps(output, indent=4, ensure_ascii=False))
-			# logger.debug(f"Enabled mods written to {json_path}")
+			logger.debug(f"Enabled mods written to {json_path}")
 
 	def _write_to_mods_txt(self, mods: list[UE4SSMod]) -> None:
 		"""
@@ -123,7 +136,7 @@ class UE4SSModManager:
 
 		with Path.open(txt_path, "w", encoding="utf-8") as f:
 			f.writelines(output)
-			# logger.debug(f"Enabled mods written to {txt_path}")
+			logger.debug(f"Enabled mods written to {txt_path}")
 
 	def parse_mods(
 		self,
@@ -160,7 +173,7 @@ class UE4SSModManager:
 				for mod in disabled_mods:
 					mod.disable()
 
-		# logger.debug(f"Parsed {len(mods)} mods.")
+		logger.debug(f"Parsed {len(mods)} mods.")
 
 	@property
 	def enabled_mods(self) -> list[UE4SSMod]:
